@@ -26,12 +26,6 @@ Resources:
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
-      - IpProtocol: tcp
-        FromPort: 8080
-        ToPort: 8080
-        CidrIp: 0.0.0.0/0
-
 
   WebServerSecGroup:
     Type: AWS::EC2::SecurityGroup
@@ -42,12 +36,8 @@ Resources:
           !Sub "${EnvironmentName}-VPCID"  
       SecurityGroupIngress:
       - IpProtocol: tcp
-        FromPort: 8080
-        ToPort: 8080
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
+        FromPort: 80
+        ToPort: 80
         CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
       - IpProtocol: tcp
@@ -55,16 +45,18 @@ Resources:
         ToPort: 65535
         CidrIp: 0.0.0.0/0
 
-  #ProfileWithRolesForOurApp:
-  #  Type: AWS::IAM::InstanceProfile
-  #  Properties: 
-  #    Roles:
-  #      - UdacityS3ReadOnlyEC2
+  ProfileWithRolesForOurApp:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Roles:
+        - "UdacityS3ReadOnlyEC2"
 
   WebAppLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
-      UserData:
+      IamInstanceProfile:
+        Ref: "ProfileWithRolesForOurApp"
+      UserData: 
         Fn::Base64: !Sub |
           #!/bin/bash
           apt-get update -y
@@ -72,8 +64,8 @@ Resources:
           apt-get install apache2 -y
           systemctl start apache2.service
           cd /var/www/html
-          #aws s3 cp s3://udacity-demo-1/udacity.zip .
-          #unzip -o udacity.zip
+          aws s3 cp s3://udacity-demo-1/udacity.zip .
+          unzip -o udacity.zip
       ImageId: ami-005bdb005fb00e791
       #IamInstanceProfile: !Ref ProfileWithRolesForOurApp
       SecurityGroups:
@@ -92,8 +84,8 @@ Resources:
       VPCZoneIdentifier: 
       - Fn::ImportValue:
           !Sub "${EnvironmentName}-PRIV-NETS"
-      MinSize: "3"
-      MaxSize: "5"
+      MinSize: "4"
+      MaxSize: "4"
       TargetGroupARNs:
         - Ref: WebAppTargetGroup
   
@@ -144,3 +136,10 @@ Resources:
       VpcId: 
         Fn::ImportValue:
           Fn::Sub: "${EnvironmentName}-VPCID"
+
+Outputs:
+  WebAppLB: 
+      Description: "The Load Balancer URL"
+      Value: !Sub "http://${WebAppLB.DNSName}"
+      Export: 
+        Name: !Sub ${EnvironmentName}-ELB-URL
