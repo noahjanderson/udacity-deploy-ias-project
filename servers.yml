@@ -39,6 +39,10 @@ Resources:
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
       - IpProtocol: tcp
         FromPort: 0
@@ -54,20 +58,22 @@ Resources:
   WebAppLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
+      UserData: !Base64 |
+        #!/bin/bash
+        exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+        sudo su
+        apt-get update -y
+        apt-get install unzip awscli -y
+        apt-get install apache2 -y
+        systemctl start apache2.service
+        cd /var/www/html
+        aws s3 cp s3://udacity-demo-1/udacity.zip .
+        unzip -o udacity.zip
+        /bin/echo "Hello World" >> /tmp/testfile.txt
       IamInstanceProfile:
         Ref: "ProfileWithRolesForOurApp"
-      UserData: 
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          apt-get update -y
-          apt-get install unzip awscli -y
-          apt-get install apache2 -y
-          systemctl start apache2.service
-          cd /var/www/html
-          aws s3 cp s3://udacity-demo-1/udacity.zip .
-          unzip -o udacity.zip
+      KeyName: UdacityCFNEC2Key
       ImageId: ami-005bdb005fb00e791
-      #IamInstanceProfile: !Ref ProfileWithRolesForOurApp
       SecurityGroups:
       - Ref: WebServerSecGroup
       InstanceType: t3.medium
@@ -83,7 +89,7 @@ Resources:
         Ref: WebAppLaunchConfig
       VPCZoneIdentifier: 
       - Fn::ImportValue:
-          !Sub "${EnvironmentName}-PRIV-NETS"
+          !Sub "${EnvironmentName}-PUB-NETS"
       MinSize: "4"
       MaxSize: "4"
       TargetGroupARNs:
@@ -125,10 +131,10 @@ Resources:
   WebAppTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      HealthCheckIntervalSeconds: 35
+      HealthCheckIntervalSeconds: 140
       HealthCheckPath: /
       HealthCheckProtocol: HTTP
-      HealthCheckTimeoutSeconds: 30
+      HealthCheckTimeoutSeconds: 120
       HealthyThresholdCount: 2
       Port: 80
       Protocol: HTTP
