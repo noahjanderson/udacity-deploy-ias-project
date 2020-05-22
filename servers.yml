@@ -23,8 +23,8 @@ Resources:
         CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
       - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
+        FromPort: 0
+        ToPort: 65535
         CidrIp: 0.0.0.0/0
 
   WebServerSecGroup:
@@ -39,10 +39,6 @@ Resources:
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
-        SourceSecurityGroupId: !Ref LBSecGroup
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
@@ -69,7 +65,6 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          sudo -s
           exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
           apt-get update -y
           apt-get upgrade -y
@@ -87,7 +82,7 @@ Resources:
         Ref: WebAppLaunchConfig
       VPCZoneIdentifier: 
       - Fn::ImportValue:
-          !Sub "${EnvironmentName}-PRIV-NETS"
+          !Sub "${EnvironmentName}-PUB-NETS"
       MinSize: "4"
       MaxSize: "4"
       TargetGroupARNs:
@@ -96,7 +91,6 @@ Resources:
   WebAppLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Scheme: internet-facing
       Subnets:
       - Fn::ImportValue: !Sub "${EnvironmentName}-PUB1-SN"
       - Fn::ImportValue: !Sub "${EnvironmentName}-PUB2-SN"
