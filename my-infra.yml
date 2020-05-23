@@ -243,12 +243,12 @@ Outputs:
 
     PublicSubnet1:
       Description: "A reference to the public subnet1 inside of the VPC"
-      Value: !Ref PrivateSubnet1
+      Value: !Ref PublicSubnet1
       Export: 
         Name: !Sub ${EnvironmentName}-PUB1-SN
 
     PublicSubnet2:
       Description: "A reference to the public subnet2 inside of the VPC"
-      Value: !Ref PrivateSubnet2
+      Value: !Ref PublicSubnet2
       Export: 
         Name: !Sub ${EnvironmentName}-PUB2-SN

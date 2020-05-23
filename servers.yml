@@ -13,41 +13,68 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow http to client host
-      VpcId:
+      VpcId: 
         Fn::ImportValue:
-          !Sub "${EnvironmentName}-VPCID"  
+          Fn::Sub: "${EnvironmentName}-VPCID"
       SecurityGroupIngress:
       - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
-        CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
-      - IpProtocol: tcp
-        FromPort: 0
-        ToPort: 65535
         CidrIp: 0.0.0.0/0
 
   WebServerSecGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow http to client host
-      VpcId:
+      VpcId: 
         Fn::ImportValue:
-          !Sub "${EnvironmentName}-VPCID"
+          Fn::Sub: "${EnvironmentName}-VPCID"
       SecurityGroupIngress:
       - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
-        CidrIp: 0.0.0.0/0
+        SourceSecurityGroupId: !Ref LBSecGroup
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
-        CidrIp: 0.0.0.0/0
+        SourceSecurityGroupId: !Ref BastionSG
       SecurityGroupEgress:
       - IpProtocol: tcp
         FromPort: 0
         ToPort: 65535
         CidrIp: 0.0.0.0/0
+        
+  BastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      VpcId: 
+        Fn::ImportValue:
+          Fn::Sub: "${EnvironmentName}-VPCID"
+      GroupDescription: Security Group for Bastion Host to allow SSH
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  BastionHost:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: ami-003634241a8fcdec0
+      InstanceType: t2.micro
+      KeyName: UdacityCFNEC2Key
+      BlockDeviceMappings:
+        - DeviceName: /dev/sdk
+          Ebs:
+            VolumeSize: '10'
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          GroupSet:
+            - Ref: BastionSG
+          SubnetId:
+            Fn::ImportValue:
+              Fn::Sub: "${EnvironmentName}-PUB1-SN"
 
   WebAppLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
@@ -82,7 +109,7 @@ Resources:
         Ref: WebAppLaunchConfig
       VPCZoneIdentifier: 
       - Fn::ImportValue:
-          !Sub "${EnvironmentName}-PUB-NETS"
+          !Sub "${EnvironmentName}-PRIV-NETS"
       MinSize: "4"
       MaxSize: "4"
       TargetGroupARNs:
@@ -91,11 +118,14 @@ Resources:
   WebAppLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
+      Name: !Sub "${EnvironmentName}-ALB"
+      Scheme: internet-facing
       Subnets:
       - Fn::ImportValue: !Sub "${EnvironmentName}-PUB1-SN"
       - Fn::ImportValue: !Sub "${EnvironmentName}-PUB2-SN"
       SecurityGroups:
       - Ref: LBSecGroup
+      Type: application
 
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -127,6 +157,8 @@ Resources:
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 8
       HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: '200'
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 5
