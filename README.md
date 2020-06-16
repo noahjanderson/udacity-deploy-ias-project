@@ -3,6 +3,8 @@ A project to explore the usage of AWS Cloud Formation Script to be able to quick
 
 # Diagram
 
+![Network and Servers Diagram](https://github.com/noahjanderson/udacity-deploy-ias-project/blob/master/AWS%20VPC%20HA%20APP.png?raw=true)
+
 
 
 ## Server specs
